@@ -1,85 +1,137 @@
-// Vercel serverless function for webhook
-const axios = require('axios');
+// api/webhook.js - Improved WhatsApp Webhook Handler (wired to services)
+const crypto = require('crypto');
+const { validateConfig } = require('../config/validator');
+const MessageHandler = require('../services/messageHandler');
+const WhatsAppService = require('../services/whatsappService');
+const { checkRateLimit } = require('../utils/rateLimiter');
 
-module.exports = async (req, res) => {
-    // Add CORS headers
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+// Validate environment on module load
+try {
+    validateConfig();
+} catch (err) {
+    // In serverless environments you may want to fail fast
+    console.error('Environment validation failed:', err.message);
+    // Do not throw to avoid crashing Vercel build step; handlers will still error on use.
+}
 
-    if (req.method === 'OPTIONS') {
-        res.status(200).end();
-        return;
+const API_VERSION = 'v18.0';
+
+const messageHandler = new MessageHandler();
+const waService = new WhatsAppService({ apiVersion: API_VERSION });
+
+function verifySignature(req) {
+    const APP_SECRET = process.env.WHATSAPP_APP_SECRET;
+    if (!APP_SECRET) {
+        console.warn('⚠️ APP_SECRET not set - skipping signature verification');
+        return true;
     }
 
-    const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;
-    const VERIFY_TOKEN = process.env.VERIFY_TOKEN || "maachbazar-secret123"; // fallback for dev
-    const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
+    const signature = req.headers['x-hub-signature-256'];
+    if (!signature) return false;
 
-    // ✅ Webhook verification (GET)
+    try {
+        const expected = 'sha256=' + crypto.createHmac('sha256', APP_SECRET).update(JSON.stringify(req.body)).digest('hex');
+        return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
+    } catch (e) {
+        console.error('Signature verification error', e.message);
+        return false;
+    }
+}
+
+module.exports = async (req, res) => {
+    // CORS headers
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Hub-Signature-256');
+
+    if (req.method === 'OPTIONS') return res.status(200).end();
+
+    // Webhook verification
     if (req.method === 'GET') {
         const mode = req.query['hub.mode'];
         const token = req.query['hub.verify_token'];
         const challenge = req.query['hub.challenge'];
 
-        console.log('🔎 Webhook verification request:', { mode, token, challenge });
-
-        if (mode === 'subscribe' && token === VERIFY_TOKEN) {
-            console.log('✅ Webhook Verified Successfully!');
-            res.status(200).send(challenge); // MUST send challenge as plain text
-        } else {
-            console.log('❌ Webhook Verification Failed — Token mismatch');
-            res.status(403).send('Forbidden');
+        console.log('🔍 Webhook verification request');
+        if (mode === 'subscribe' && token === process.env.VERIFY_TOKEN) {
+            return res.status(200).send(challenge);
         }
-        return;
+        return res.status(403).send('Forbidden');
     }
 
-    // ✅ Handle incoming messages (POST)
     if (req.method === 'POST') {
-        const body = req.body;
-        console.log("📩 Incoming webhook body:", JSON.stringify(body, null, 2));
+        // optional signature verification in production
+        if (process.env.NODE_ENV === 'production' && !verifySignature(req)) {
+            console.error('❌ Invalid webhook signature');
+            return res.status(401).send('Unauthorized');
+        }
 
+        // Quick 200 to acknowledge
+        res.status(200).send('EVENT_RECEIVED');
+
+        // Update last webhook timestamp for health checks
         try {
-            if (
-                body.object &&
-                body.entry &&
-                body.entry[0].changes &&
-                body.entry[0].changes[0].value &&
-                body.entry[0].changes[0].value.messages
-            ) {
-                const message = body.entry[0].changes[0].value.messages[0];
+            process.MAACHBAZAR_LAST_WEBHOOK = new Date().toISOString();
+        } catch (e) {
+            // ignore
+        }
+
+        const body = req.body;
+        try {
+            if (body.object !== 'whatsapp_business_account') return;
+
+            const entry = body.entry?.[0];
+            const changes = entry?.changes?.[0];
+            const value = changes?.value;
+            const messages = value?.messages;
+
+            if (!messages || messages.length === 0) return;
+
+            for (const message of messages) {
                 const from = message.from;
+                const messageId = message.id;
 
-                console.log(`💬 Message from ${from}:`, message);
+                console.log(`� Received message ${messageId} from ${from}`);
 
-                // Reply to the sender
-                if (WHATSAPP_TOKEN && PHONE_NUMBER_ID) {
-                    await axios.post(
-                        `https://graph.facebook.com/v18.0/${PHONE_NUMBER_ID}/messages`,
-                        {
-                            messaging_product: 'whatsapp',
-                            to: from,
-                            text: { body: "Hello from Maachbazar! How can I help you today?" }
-                        },
-                        {
-                            headers: {
-                                Authorization: `Bearer ${WHATSAPP_TOKEN}`,
-                                'Content-Type': 'application/json'
-                            }
-                        }
-                    );
-                    console.log(`✅ Message sent to ${from}`);
-                } else {
-                    console.warn("⚠️ Missing WhatsApp token or phone number ID — skipping reply");
+                try {
+                    // Mark read (best effort)
+                    await waService.markAsRead(messageId);
+
+                    // Rate limiting per phone number
+                    const allowed = await checkRateLimit(from);
+                    if (!allowed) {
+                        await waService.sendTextMessage(from, '⚠️ You are sending messages too frequently. Please wait a moment.');
+                        continue;
+                    }
+
+                    // Process message using MessageHandler
+                    const response = await messageHandler.processMessage(message);
+
+                    // Send response using WhatsApp service
+                    if (response && response.type === 'interactive') {
+                        await waService.sendInteractiveMessage(from, response.interactive);
+                    } else if (response && response.text) {
+                        await waService.sendTextMessage(from, response.text);
+                    } else {
+                        // default fallback - send as text if object
+                        await waService.sendTextMessage(from, typeof response === 'string' ? response : JSON.stringify(response));
+                    }
+
+                    console.log(`✅ Processed message ${messageId}`);
+
+                } catch (err) {
+                    console.error('Error processing message:', err.message || err);
+                    try {
+                        await waService.sendTextMessage(from, '😔 Sorry, something went wrong. Please try again later.');
+                    } catch (ignore) {}
                 }
             }
-        } catch (error) {
-            console.error("❌ Error handling webhook POST:", error.response ? error.response.data : error.message);
+        } catch (err) {
+            console.error('Webhook processing error:', err.message || err);
         }
 
-        res.status(200).send('EVENT_RECEIVED');
         return;
     }
 
-    res.status(405).send('Method Not Allowed');
+    return res.status(405).send('Method Not Allowed');
 };
