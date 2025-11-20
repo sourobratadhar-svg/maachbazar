@@ -1,0 +1,14 @@
+# wrangler.toml - optional config for Cloudflare Wrangler / Pages
+# Fill the placeholders below before using wrangler or CI deploys.
+
+name = "maachbazar.in"
+type = "webpack"
+
+# Your Cloudflare Account ID
+account_id = "58a56e52326cb5c0cf6c1b40decfb0fa"
+
+# Pages project name (the project slug in Cloudflare Pages)
+project_name = "maachbazar.in"
+
+# Set a compatibility date for Wrangler (YYYY-MM-DD)
+compatibility_date = "2025-01-01"
