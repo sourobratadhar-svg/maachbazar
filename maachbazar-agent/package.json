@@ -1,26 +1,14 @@
 {
   "name": "maachbazar-whatsapp-agent",
   "version": "1.0.0",
-  "description": "WhatsApp Business API agent for MaachBazar fish and poultry ordering",
-  "main": "index.js",
+  "type": "module",
+  "description": "WhatsApp Business API agent for MaachBazar",
+  "main": "api/index.js",
   "scripts": {
-    "start": "node index.js",
-    "dev": "node index.js"
+    "dev": "vercel dev"
   },
-  "keywords": [
-    "whatsapp",
-    "business-api",
-    "fish",
-    "poultry",
-    "ordering"
-  ],
-  "author": "MaachBazar",
-  "license": "ISC",
   "dependencies": {
-    "axios": "^1.12.2",
-    "dotenv": "^16.6.1",
-    "express": "^4.18.2",
-    "rate-limiter-flexible": "^2.2.4"
+    "axios": "^1.13.2"
   },
   "engines": {
     "node": ">=18.0.0"
