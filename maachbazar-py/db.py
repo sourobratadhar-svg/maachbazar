@@ -1,0 +1,185 @@
+import os
+from supabase import create_client, Client
+from dotenv import load_dotenv
+import logging
+
+load_dotenv()
+logger = logging.getLogger(__name__)
+
+url: str = os.environ.get("SUPABASE_URL")
+key: str = os.environ.get("SUPABASE_KEY")
+
+supabase: Client = None
+
+if url and key:
+    try:
+        supabase = create_client(url, key)
+    except Exception as e:
+        logger.error(f"Failed to initialize Supabase: {e}")
+
+def get_inventory():
+    """
+    Fetches inventory from Supabase.
+    Returns a list of dicts: [{'name': 'Rohu', 'price': 250}, ...]
+    """
+    if not supabase:
+        logger.warning("Supabase not configured, returning empty inventory")
+        return []
+    
+    try:
+        response = supabase.table("inventory").select("*").execute()
+        return response.data
+    except Exception as e:
+        logger.error(f"Error fetching inventory: {e}")
+        return []
+
+def update_price(fish_name: str, new_price: int):
+    """
+    Updates the price of a specific fish in Supabase.
+    """
+    if not supabase:
+        return {"error": "Supabase not configured"}
+
+    try:
+        response = supabase.table("inventory").update({"price": new_price}).eq("name", fish_name).execute()
+        return response.data
+    except Exception as e:
+        logger.error(f"Error updating price: {e}")
+        return {"error": str(e)}
+
+def update_inventory_item(item_id: int, price: int, is_available: bool):
+    """
+    Updates price and availability of an inventory item.
+    """
+    if not supabase:
+        return {"error": "Supabase not configured"}
+
+    try:
+        response = supabase.table("inventory").update({
+            "price": price,
+            "is_available": is_available
+        }).eq("id", item_id).execute()
+        return response.data
+    except Exception as e:
+        logger.error(f"Error updating inventory item: {e}")
+        return {"error": str(e)}
+
+def add_fish(name: str, price: int, is_available: bool = True):
+    """
+    Adds a new fish to the inventory.
+    """
+    if not supabase:
+        return {"error": "Supabase not configured"}
+
+    try:
+        response = supabase.table("inventory").insert({
+            "name": name,
+            "price": price,
+            "is_available": is_available
+        }).execute()
+        return response.data
+    except Exception as e:
+        logger.error(f"Error adding fish: {e}")
+        return {"error": str(e)}
+
+def get_or_create_user(phone_number: str):
+    """
+    Checks if user exists. If not, creates them.
+    Returns: (user_data, is_new)
+    """
+    if not supabase:
+        return None, False
+
+    try:
+        # Check if user exists
+        response = supabase.table("users").select("*").eq("phone", phone_number).execute()
+        if response.data:
+            return response.data[0], False
+        
+        # Create new user
+        new_user = {"phone": phone_number, "language": None}
+        response = supabase.table("users").insert(new_user).execute()
+        return response.data[0], True
+    except Exception as e:
+        logger.error(f"Error in get_or_create_user: {e}")
+        return None, False
+
+def update_user_language(phone_number: str, language: str):
+    """
+    Updates the user's preferred language.
+    """
+    if not supabase: return
+    try:
+        supabase.table("users").update({"language": language}).eq("phone", phone_number).execute()
+    except Exception as e:
+        logger.error(f"Error updating language: {e}")
+
+def log_message(phone_number: str, role: str, content: str):
+    """
+    Logs a message to the database.
+    Role: 'user' or 'assistant'
+    """
+    if not supabase: return
+    try:
+        supabase.table("messages").insert({
+            "user_phone": phone_number,
+            "role": role,
+            "content": content
+        }).execute()
+    except Exception as e:
+        logger.error(f"Error logging message: {e}")
+
+def get_chat_history(phone_number: str, limit: int = 5):
+    """
+    Fetches the last N messages for context.
+    """
+    if not supabase: return []
+    try:
+        response = supabase.table("messages").select("*")\
+            .eq("user_phone", phone_number)\
+            .order("created_at", desc=True)\
+            .limit(limit)\
+            .execute()
+        # Return reversed list (oldest first) for AI context
+        return response.data[::-1] if response.data else []
+    except Exception as e:
+        logger.error(f"Error fetching history: {e}")
+        return []
+
+def get_inventory_string():
+    """
+    Fetches all available items and returns a formatted string.
+    Example: "Rohu: 250/kg, Katla: 300/kg"
+    """
+    if not supabase:
+        return "Inventory unavailable"
+    
+    try:
+        response = supabase.table("inventory").select("*").eq("is_available", True).execute()
+        items = response.data
+        if not items:
+            return "No items available today."
+        
+        # Format: "Name: Price/kg"
+        formatted_items = [f"{item['name']}: {item['price']}/kg" for item in items]
+        return ", ".join(formatted_items)
+    except Exception as e:
+        logger.error(f"Error fetching inventory string: {e}")
+        return "Error fetching prices"
+
+def get_user_language(phone_number: str):
+    """
+    Fetches the user's preferred language.
+    Defaults to 'English' if not set.
+    """
+    if not supabase:
+        return "English"
+    
+    try:
+        response = supabase.table("users").select("language").eq("phone", phone_number).execute()
+        if response.data and response.data[0].get("language"):
+            return response.data[0]["language"]
+        return "English"
+    except Exception as e:
+        logger.error(f"Error fetching user language: {e}")
+        return "English"
