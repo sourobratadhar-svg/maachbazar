@@ -38,7 +38,7 @@ Assistant:
         # Note: ai.generate_response currently takes a simple prompt.
         # We might need to adjust it if we want to pass system instructions dynamically,
         # but for now, passing the full context in the prompt is a good start.
-        response = ai.generate_response(full_prompt)
+        response = ai.generate_response(full_prompt, user_phone=sender_id)
         
         return response
 

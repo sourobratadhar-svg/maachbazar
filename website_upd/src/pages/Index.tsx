@@ -20,7 +20,7 @@ interface InventoryItem {
   is_available: boolean;
 }
 
-const API_BASE = "http://localhost:8000";
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 const Index = () => {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
@@ -104,9 +104,14 @@ const Index = () => {
       <div className="max-w-4xl mx-auto space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle className="text-3xl font-bold text-center">
-              🐟 Maachbazar Admin Dashboard
-            </CardTitle>
+            <div className="flex justify-between items-center">
+              <CardTitle className="text-3xl font-bold text-center">
+                🐟 Maachbazar Admin Dashboard
+              </CardTitle>
+              <Button asChild>
+                <a href="/orders">View Orders</a>
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             {loading ? (

@@ -5,3 +5,5 @@ google-generativeai
 requests
 pyngrok
 supabase
+pydantic
+gunicorn

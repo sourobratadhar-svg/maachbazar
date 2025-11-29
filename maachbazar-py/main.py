@@ -70,6 +70,56 @@ async def add_fish(fish: AddFish):
 async def update_price(update: PriceUpdate):
     return db.update_price(update.name, update.price)
 
+@app.get("/api/orders")
+async def get_orders():
+    return db.get_all_orders()
+
+class OrderStatusUpdate(BaseModel):
+    order_id: int
+    status: str
+
+@app.post("/api/orders/status")
+async def update_order_status(update: OrderStatusUpdate):
+    # 1. Update in DB
+    result = db.update_order_status(update.order_id, update.status)
+    
+    if "error" in result:
+        raise HTTPException(status_code=500, detail=result["error"])
+    
+    if not result:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    # 2. Notify User via WhatsApp
+    order = result[0]
+    user_phone = order.get("user_phone")
+    
+    if user_phone:
+        if update.status == "confirmed":
+            message = f"Your order #{update.order_id} has been CONFIRMED! We will deliver it shortly. 🐟"
+        elif update.status == "rejected":
+            message = f"Sorry, your order #{update.order_id} has been CANCELLED. Please contact us for details."
+        else:
+            message = f"Update on your order #{update.order_id}: Status is now '{update.status}'."
+            
+        whatsapp.send_message(user_phone, message)
+        db.log_message(user_phone, "assistant", message)
+
+    return {"status": "success", "order": order}
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+@app.post("/api/login")
+async def login(credentials: LoginRequest):
+    admin_user = os.getenv("ADMIN_USERNAME", "admin")
+    admin_pass = os.getenv("ADMIN_PASSWORD", "password")
+    
+    if credentials.username == admin_user and credentials.password == admin_pass:
+        return {"token": "fake-jwt-token-for-demo", "message": "Login successful"}
+    else:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
 @app.get("/")
 async def root():
     return {"message": "Maachbazar Bot is running! 🐟"}

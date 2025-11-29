@@ -183,3 +183,92 @@ def get_user_language(phone_number: str):
     except Exception as e:
         logger.error(f"Error fetching user language: {e}")
         return "English"
+
+def create_order(user_phone: str, items: list):
+    """
+    Creates a new order with multiple items.
+    items: list of dicts [{'fish_name': 'Rohu', 'quantity': 1.5, 'price_per_kg': 250}]
+    """
+    if not supabase:
+        return {"error": "Supabase not configured"}
+
+    try:
+        # 1. Calculate total price
+        total_price = 0
+        for item in items:
+            item['subtotal'] = int(item['quantity'] * item['price_per_kg'])
+            total_price += item['subtotal']
+
+        # 2. Create Order
+        order_response = supabase.table("orders").insert({
+            "user_phone": user_phone,
+            "total_price": int(total_price),
+            "status": "pending"
+        }).execute()
+        
+        if not order_response.data:
+            return {"error": "Failed to create order"}
+            
+        order_id = order_response.data[0]['id']
+
+        # 3. Create Order Items
+        order_items_data = []
+        for item in items:
+            order_items_data.append({
+                "order_id": order_id,
+                "fish_name": item['fish_name'],
+                "quantity": item['quantity'],
+                "price_per_kg": int(item['price_per_kg']),
+                "subtotal": int(item['subtotal'])
+            })
+            
+        logger.info(f"Inserting order items: {order_items_data}")
+        supabase.table("order_items").insert(order_items_data).execute()
+        
+        return {"order_id": order_id, "total_price": total_price, "status": "success"}
+
+    except Exception as e:
+        logger.error(f"Error creating order: {e}")
+        return {"error": str(e)}
+
+def get_user_orders(user_phone: str):
+    """
+    Fetches past orders for a user.
+    """
+    if not supabase: return []
+    try:
+        response = supabase.table("orders").select("*, order_items(*)")\
+            .eq("user_phone", user_phone)\
+            .order("created_at", desc=True)\
+            .limit(5)\
+            .execute()
+        return response.data
+    except Exception as e:
+        logger.error(f"Error fetching user orders: {e}")
+        return []
+
+
+def get_all_orders():
+    """
+    Fetches all orders for the admin dashboard.
+    """
+    if not supabase: return []
+    try:
+        response = supabase.table("orders").select("*, order_items(*)").order("created_at", desc=True).execute()
+        return response.data
+    except Exception as e:
+        logger.error(f"Error fetching all orders: {e}")
+        return []
+
+def update_order_status(order_id: int, status: str):
+    """
+    Updates the status of an order.
+    """
+    if not supabase: return {"error": "Supabase not configured"}
+    try:
+        response = supabase.table("orders").update({"status": status}).eq("id", order_id).execute()
+        return response.data
+    except Exception as e:
+        logger.error(f"Error updating order status: {e}")
+        return {"error": str(e)}
+

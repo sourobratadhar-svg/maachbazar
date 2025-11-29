@@ -48,31 +48,106 @@ model = genai.GenerativeModel(
     model_name="gemini-flash-latest"
 )
 
-def generate_response(prompt: str) -> str:
+
+# Tool Definition
+place_order_tool = {
+    "function_declarations": [
+        {
+            "name": "place_order",
+            "description": "Places an order for fish. Use this when the user explicitly confirms they want to buy.",
+            "parameters": {
+                "type": "OBJECT",
+                "properties": {
+                    "items": {
+                        "type": "ARRAY",
+                        "description": "List of items to order",
+                        "items": {
+                            "type": "OBJECT",
+                            "properties": {
+                                "fish_name": {"type": "STRING", "description": "Name of the fish (e.g., Rohu, Katla)"},
+                                "quantity": {"type": "NUMBER", "description": "Quantity in kg"},
+                                "price_per_kg": {"type": "INTEGER", "description": "Price per kg at the time of order"}
+                            },
+                            "required": ["fish_name", "quantity", "price_per_kg"]
+                        }
+                    }
+                },
+                "required": ["items"]
+            }
+        }
+    ]
+}
+
+def generate_response(prompt: str, user_phone: str = None) -> str:
     """
     Generates a response from Gemini based on the user's prompt.
+    Supports function calling for placing orders.
     """
     if not GEMINI_API_KEY:
         return "I'm sorry, my brain is currently offline (API Key missing). 😵"
 
     try:
-        # Update system instruction with latest prices for every request
-        # Note: In a high-traffic app, you'd cache this or use a tool.
         current_instruction = get_system_instruction()
         
-        # We create a new chat/model instance or just generate content with the instruction
-        # For simple one-off replies, generating content with system instruction is fine.
-        # However, gemini-pro/flash usually takes system_instruction at init.
-        # To make it dynamic per request without re-init, we can prepend it to the prompt 
-        # OR re-initialize the model (lightweight).
-        
+        # Initialize model with tools
         dynamic_model = genai.GenerativeModel(
             model_name="gemini-flash-latest",
-            system_instruction=current_instruction
+            system_instruction=current_instruction,
+            tools=[place_order_tool]
         )
         
-        response = dynamic_model.generate_content(prompt)
+        # Start a chat session to handle function calls naturally
+        chat = dynamic_model.start_chat(enable_automatic_function_calling=True)
+        
+        # We need to manually handle the function execution if we want to use our db.create_order
+        # But genai's automatic function calling usually requires the function to be passed in the tools list as a callable
+        # OR we handle the response parts.
+        
+        # Let's try the manual approach for better control:
+        # 1. Generate content with tools config
+        response = dynamic_model.generate_content(
+            prompt,
+            tools=[place_order_tool],
+            tool_config={'function_calling_config': {'mode': 'AUTO'}}
+        )
+        
+        # 2. Check for function call
+        if not response.candidates:
+            logger.error(f"Gemini returned no candidates. Response: {response}")
+            return "I'm sorry, I couldn't generate a response (No candidates)."
+
+        candidate = response.candidates[0]
+        if not candidate.content.parts:
+            logger.error(f"Gemini candidate has no parts. Candidate: {candidate}")
+            return "I'm sorry, I couldn't generate a response (No parts)."
+
+        part = candidate.content.parts[0]
+        
+        if part.function_call:
+            fc = part.function_call
+            if fc.name == "place_order":
+                if not user_phone:
+                    return "I need your phone number to place an order. (System Error: Phone not passed)"
+                
+                # Extract args
+                items_data = []
+                for item in fc.args["items"]:
+                    items_data.append({
+                        "fish_name": item["fish_name"],
+                        "quantity": item["quantity"],
+                        "price_per_kg": item["price_per_kg"]
+                    })
+                
+                # Execute DB function
+                result = db.create_order(user_phone, items_data)
+                
+                if "error" in result:
+                    return f"Sorry, I couldn't place the order. Error: {result['error']}"
+                
+                return f"Order placed successfully! Order ID: #{result['order_id']}. Total: ₹{result['total_price']}. We will contact you shortly for delivery."
+
         return response.text
     except Exception as e:
         logger.error(f"Gemini API Error: {e}")
         return "Aare dada, ektu problem hocche. Please try again later. 😓"
+
