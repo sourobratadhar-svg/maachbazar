@@ -23,7 +23,10 @@ def generate_response(sender_id: str, message_text: str) -> str:
             content = msg["content"]
             history_text += f"{role}: {content}\n"
 
-        # 3. Construct Prompt
+        # 3. Fetch User Address
+        user_address = db.get_user_address(sender_id)
+
+        # 4. Construct Prompt
         # We wrap the user's message with context
         full_prompt = f"""
 User Language Preference: {language}
@@ -34,11 +37,8 @@ Chat History:
 User: {message_text}
 Assistant:
 """
-        # 4. Call AI Service
-        # Note: ai.generate_response currently takes a simple prompt.
-        # We might need to adjust it if we want to pass system instructions dynamically,
-        # but for now, passing the full context in the prompt is a good start.
-        response = ai.generate_response(full_prompt, user_phone=sender_id)
+        # 5. Call AI Service
+        response = ai.generate_response(full_prompt, user_phone=sender_id, user_address=user_address)
         
         return response
 

@@ -25,12 +25,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI()
 
 # Allow CORS for Frontend (Vite runs on 5173 or 8080)
-origins = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "http://localhost:8080",
-    "http://127.0.0.1:8080",
-]
+origins = ["*"]
 
 app.add_middleware(
     CORSMiddleware,

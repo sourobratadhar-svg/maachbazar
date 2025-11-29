@@ -184,7 +184,30 @@ def get_user_language(phone_number: str):
         logger.error(f"Error fetching user language: {e}")
         return "English"
 
-def create_order(user_phone: str, items: list):
+def update_user_address(phone_number: str, address: str):
+    """
+    Updates the user's address.
+    """
+    if not supabase: return
+    try:
+        supabase.table("users").update({"address": address}).eq("phone", phone_number).execute()
+    except Exception as e:
+        logger.error(f"Error updating address: {e}")
+
+def get_user_address(phone_number: str):
+    """
+    Fetches the user's address.
+    """
+    if not supabase: return None
+    try:
+        response = supabase.table("users").select("address").eq("phone", phone_number).execute()
+        if response.data and response.data[0].get("address"):
+            return response.data[0]["address"]
+        return None
+    except Exception as e:
+        logger.error(f"Error fetching address: {e}")
+        return None
+def create_order(user_phone: str, items: list, address: str = None):
     """
     Creates a new order with multiple items.
     items: list of dicts [{'fish_name': 'Rohu', 'quantity': 1.5, 'price_per_kg': 250}]
@@ -200,11 +223,17 @@ def create_order(user_phone: str, items: list):
             total_price += item['subtotal']
 
         # 2. Create Order
-        order_response = supabase.table("orders").insert({
+        order_data = {
             "user_phone": user_phone,
             "total_price": int(total_price),
             "status": "pending"
-        }).execute()
+        }
+        if address:
+            order_data["delivery_address"] = address
+            # Also update user profile
+            update_user_address(user_phone, address)
+
+        order_response = supabase.table("orders").insert(order_data).execute()
         
         if not order_response.data:
             return {"error": "Failed to create order"}
