@@ -108,14 +108,9 @@ const Index = () => {
               <CardTitle className="text-3xl font-bold text-center">
                 🐟 Maachbazar Admin Dashboard
               </CardTitle>
-              <div className="flex gap-2">
-                <Button asChild variant="outline">
-                  <a href="/prices">View Daily Prices</a>
-                </Button>
-                <Button asChild variant="outline">
-                  <a href="/orders">View Orders</a>
-                </Button>
-              </div>
+              <Button asChild variant="outline">
+                <a href="/orders">View Orders</a>
+              </Button>
             </div>
           </CardHeader>
           <CardContent>

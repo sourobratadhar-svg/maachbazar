@@ -7,7 +7,6 @@ import Index from "./pages/Index";
 import Orders from "./pages/Orders";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
-import PublicInventory from "./pages/PublicInventory";
 
 const queryClient = new QueryClient();
 
@@ -24,7 +23,6 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
-          <Route path="/prices" element={<PublicInventory />} />
           <Route
             path="/"
             element={
