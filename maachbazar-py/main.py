@@ -166,10 +166,12 @@ async def webhook_handler(request: Request):
             whatsapp_utils.send_language_menu(sender_id)
             return {"status": "ok"}
 
-        # 3. Handle Language Selection (Interactive Reply)
+        # 3. Handle Language Selection & Button Replies (Interactive Reply)
         if msg_type == "interactive":
             interactive = message.get("interactive", {})
-            if interactive.get("type") == "list_reply":
+            interactive_type = interactive.get("type")
+
+            if interactive_type == "list_reply":
                 selection_id = interactive.get("list_reply", {}).get("id")
                 # Map selection_id to language code
                 lang_map = {"lang_en": "English", "lang_bn": "Bangla", "lang_hi": "Hinglish"}
@@ -178,6 +180,29 @@ async def webhook_handler(request: Request):
                 db.update_user_language(sender_id, selected_lang)
                 whatsapp.send_message(sender_id, f"Language set to {selected_lang}. How can I help you today?")
                 return {"status": "ok"}
+            
+            elif interactive_type == "button_reply":
+                button_id = interactive.get("button_reply", {}).get("id")
+                button_title = interactive.get("button_reply", {}).get("title")
+                
+                if button_id == "confirm_order":
+                    # Treat as text message "Confirm"
+                    message_text = "Confirm"
+                    # Proceed to process as text message below...
+                    # We can either recursively call logic or just set message_text and let it fall through
+                    # But since we have a return above, we need to restructure or just copy logic.
+                    # Simplest: Set msg_type to text and let it fall through
+                    msg_type = "text" 
+                    # We need to inject this into the message object or just handle it here.
+                    # Let's handle it here to avoid complex flow changes.
+                    
+                    logger.info(f"Processing button reply from {sender_id}: {message_text}")
+                    db.log_message(sender_id, "user", message_text)
+                    ai_response = brain.generate_response(sender_id, message_text)
+                    if ai_response:
+                        db.log_message(sender_id, "assistant", ai_response)
+                        whatsapp.send_message(sender_id, ai_response)
+                    return {"status": "ok"}
 
         # 4. Handle Text Message
         if msg_type == "text":

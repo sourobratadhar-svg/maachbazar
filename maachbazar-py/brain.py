@@ -40,6 +40,15 @@ Assistant:
         # 5. Call AI Service
         response = ai.generate_response(full_prompt, user_phone=sender_id, user_address=user_address)
         
+        # Check if response asks for confirmation
+        if "confirm" in response.lower() and "?" in response:
+             # Send interactive button
+             buttons = [{"id": "confirm_order", "title": "Confirm Korun ✅"}]
+             whatsapp_utils.send_interactive_button(sender_id, response, buttons)
+             # Log assistant message
+             db.log_message(sender_id, "assistant", response)
+             return None # Signal that message is already sent
+
         return response
 
     except Exception as e:
