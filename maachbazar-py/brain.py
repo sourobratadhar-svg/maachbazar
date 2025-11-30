@@ -1,5 +1,6 @@
 import logging
 import db
+import whatsapp_utils
 from services import ai
 
 logger = logging.getLogger(__name__)
