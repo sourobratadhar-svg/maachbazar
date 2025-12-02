@@ -15,7 +15,7 @@
     <meta name="twitter:card" content="summary_large_image">
     <link rel="canonical" href="https://www.maachbazar.in/">
     <title>MaachBazar | Fresh Fish & Poultry Delivery</title>
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap"
         rel="stylesheet">
     <style>
@@ -299,16 +299,16 @@
             <div id="price-error" class="text-center text-xl text-red-500 hidden">Unable to load prices. Please try
                 again later.</div>
 
-            <div class="overflow-x-auto">
-                <table id="price-table" class="min-w-full bg-white shadow-md rounded-lg overflow-hidden hidden">
-                    <thead class="bg-green-500 text-white">
-                        <tr>
-                            <th class="py-3 px-4 text-left">Fish Name</th>
-                            <th class="py-3 px-4 text-left">Price (per kg)</th>
-                            <th class="py-3 px-4 text-left">Status</th>
+            <div class="relative w-full overflow-auto">
+                <table id="price-table" class="w-full caption-bottom text-sm hidden">
+                    <thead class="[&_tr]:border-b">
+                        <tr class="border-b transition-colors hover:bg-gray-50">
+                            <th class="h-12 px-4 text-left align-middle font-medium text-gray-500">Fish Name</th>
+                            <th class="h-12 px-4 text-left align-middle font-medium text-gray-500">Price (₹/kg)</th>
+                            <th class="h-12 px-4 text-left align-middle font-medium text-gray-500">Available</th>
                         </tr>
                     </thead>
-                    <tbody id="price-list-body" class="text-gray-700">
+                    <tbody id="price-list-body" class="[&_tr:last-child]:border-0">
                         <!-- Prices will be inserted here -->
                     </tbody>
                 </table>
@@ -606,14 +606,14 @@
                 tbody.innerHTML = '';
                 data.forEach(item => {
                     const row = document.createElement('tr');
-                    row.className = "border-b hover:bg-gray-50";
+                    row.className = "border-b transition-colors hover:bg-gray-50";
                     row.innerHTML = `
-                        <td class="py-3 px-4 font-medium">${item.name}</td>
-                        <td class="py-3 px-4">₹${item.price}</td>
-                        <td class="py-3 px-4">
-                            <span class="px-2 py-1 rounded-full text-xs font-semibold ${item.is_available ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
-                                ${item.is_available ? 'In Stock' : 'Sold Out'}
-                            </span>
+                        <td class="p-4 align-middle font-medium">${item.name}</td>
+                        <td class="p-4 align-middle">₹${item.price}</td>
+                        <td class="p-4 align-middle">
+                            ${item.is_available
+                            ? '<span class="text-green-600 font-medium">✓ Yes</span>'
+                            : '<span class="text-red-600 font-medium">✗ No</span>'}
                         </td>
                     `;
                     tbody.appendChild(row);
