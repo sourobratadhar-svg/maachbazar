@@ -349,3 +349,29 @@ def update_order_status(order_id: int, status: str):
         logger.error(f"Error updating order status: {e}")
         return {"error": str(e)}
 
+def update_user_state(phone_number: str, state: str):
+    """
+    Updates the user's conversation state.
+    """
+    if not supabase: return
+    try:
+        # Handle nullable state (None)
+        state_val = state if state else None
+        supabase.table("users").update({"conversation_state": state_val}).eq("phone", phone_number).execute()
+    except Exception as e:
+        logger.error(f"Error updating user state: {e}")
+
+def get_user_state(phone_number: str):
+    """
+    Fetches the user's conversation state.
+    """
+    if not supabase: return None
+    try:
+        response = supabase.table("users").select("conversation_state").eq("phone", phone_number).execute()
+        if response.data and response.data[0].get("conversation_state"):
+            return response.data[0]["conversation_state"]
+        return None
+    except Exception as e:
+        logger.error(f"Error fetching user state: {e}")
+        return None
+

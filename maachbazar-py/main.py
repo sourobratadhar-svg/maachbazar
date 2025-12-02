@@ -207,12 +207,46 @@ async def webhook_handler(request: Request):
                         db.log_message(sender_id, "assistant", ai_response)
                         whatsapp.send_message(sender_id, ai_response)
                     return {"status": "ok"}
+                
+                elif button_id == "change_address":
+                    # Handle Change Address
+                    logger.info(f"User {sender_id} requested to change address")
+                    db.update_user_state(sender_id, "AWAITING_ADDRESS")
+                    
+                    response_text = "Please type your new address (include Floor, Block, Gali)."
+                    whatsapp.send_message(sender_id, response_text)
+                    db.log_message(sender_id, "assistant", response_text)
+                    return {"status": "ok"}
 
         # 4. Handle Text Message
         if msg_type == "text":
             message_text = message.get("text", {}).get("body")
             logger.info(f"Processing message from {sender_id}: {message_text}")
             
+            # 0. Check User State
+            current_state = db.get_user_state(sender_id)
+            
+            if current_state == "AWAITING_ADDRESS":
+                # Treat this text as the new address
+                new_address = message_text
+                db.update_user_address(sender_id, new_address)
+                db.update_user_state(sender_id, None) # Clear state
+                
+                # Log the address update
+                db.log_message(sender_id, "user", f"Updated address to: {new_address}")
+                
+                # Trigger confirmation again
+                confirm_msg = f"Address updated to: {new_address}. Do you want to confirm your order now?"
+                
+                # Send interactive buttons again
+                buttons = [
+                    {"id": "confirm_order", "title": "Confirm Korun ✅"},
+                    {"id": "change_address", "title": "Change Address 🏠"}
+                ]
+                wamid = whatsapp_utils.send_interactive_button(sender_id, confirm_msg, buttons)
+                db.log_message(sender_id, "assistant", confirm_msg, whatsapp_message_id=wamid)
+                return {"status": "ok"}
+
             # 1. Log User Message
             db.log_message(sender_id, "user", message_text)
 

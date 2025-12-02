@@ -44,7 +44,10 @@ Assistant:
         # Check if response asks for confirmation
         if "confirm" in response.lower() and "?" in response:
              # Send interactive button
-             buttons = [{"id": "confirm_order", "title": "Confirm Korun ✅"}]
+             buttons = [
+                 {"id": "confirm_order", "title": "Confirm Korun ✅"},
+                 {"id": "change_address", "title": "Change Address 🏠"}
+             ]
              wamid = whatsapp_utils.send_interactive_button(sender_id, response, buttons)
              # Log assistant message with wamid
              db.log_message(sender_id, "assistant", response, whatsapp_message_id=wamid)
