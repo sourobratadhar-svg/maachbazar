@@ -227,16 +227,35 @@ async def webhook_handler(request: Request):
             current_state = db.get_user_state(sender_id)
             
             if current_state == "AWAITING_ADDRESS":
+                # 0.1 Validate Address (Non-empty)
+                if not message_text or not message_text.strip():
+                    response_text = "Please provide a valid address. It cannot be empty."
+                    whatsapp.send_message(sender_id, response_text)
+                    db.log_message(sender_id, "assistant", response_text)
+                    return {"status": "ok"}
+
+                # 0.2 Check Rate Limit
+                update_count = db.get_address_update_count(sender_id)
+                if update_count >= 3:
+                    response_text = "Maximum address changes reached. Please contact support."
+                    whatsapp.send_message(sender_id, response_text)
+                    db.log_message(sender_id, "assistant", response_text)
+                    # Clear state so they are not stuck
+                    db.update_user_state(sender_id, None)
+                    return {"status": "ok"}
+
                 # Treat this text as the new address
-                new_address = message_text
+                new_address = message_text.strip()
                 db.update_user_address(sender_id, new_address)
+                db.increment_address_update_count(sender_id)
                 db.update_user_state(sender_id, None) # Clear state
                 
                 # Log the address update
                 db.log_message(sender_id, "user", f"Updated address to: {new_address}")
                 
                 # Trigger confirmation again
-                confirm_msg = f"Address updated to: {new_address}. Do you want to confirm your order now?"
+                remaining = 3 - (update_count + 1)
+                confirm_msg = f"Address updated to: {new_address}. (Changes remaining: {remaining})\nDo you want to confirm your order now?"
                 
                 # Send interactive buttons again
                 buttons = [

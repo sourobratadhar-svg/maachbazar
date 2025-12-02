@@ -302,6 +302,9 @@ def create_order(user_phone: str, items: list, address: str = None, message_id: 
                 logger.error(f"Failed to update message status for {message_id}: {e}")
                 # Don't fail the whole order if this fails, but log it.
         
+        # 5. Reset Address Update Count
+        reset_address_update_count(user_phone)
+
         return {"order_id": order_id, "total_price": total_price, "status": "success"}
 
     except Exception as e:
@@ -374,4 +377,43 @@ def get_user_state(phone_number: str):
     except Exception as e:
         logger.error(f"Error fetching user state: {e}")
         return None
+
+def get_address_update_count(phone_number: str):
+    """
+    Fetches the current address update count for the user.
+    """
+    if not supabase: return 0
+    try:
+        response = supabase.table("users").select("address_update_count").eq("phone", phone_number).execute()
+        if response.data and "address_update_count" in response.data[0]:
+            return response.data[0]["address_update_count"]
+        return 0
+    except Exception as e:
+        logger.error(f"Error fetching address update count: {e}")
+        return 0
+
+def increment_address_update_count(phone_number: str):
+    """
+    Increments the address update count by 1.
+    """
+    if not supabase: return
+    try:
+        # We can't do atomic increment easily with simple update, so read-modify-write or RPC.
+        # For simplicity in this context, we'll read then write, or use a raw query if possible.
+        # Supabase-py doesn't support raw SQL easily without RPC.
+        # Let's do read-modify-write for now (low concurrency expected per user).
+        current = get_address_update_count(phone_number)
+        supabase.table("users").update({"address_update_count": current + 1}).eq("phone", phone_number).execute()
+    except Exception as e:
+        logger.error(f"Error incrementing address update count: {e}")
+
+def reset_address_update_count(phone_number: str):
+    """
+    Resets the address update count to 0.
+    """
+    if not supabase: return
+    try:
+        supabase.table("users").update({"address_update_count": 0}).eq("phone", phone_number).execute()
+    except Exception as e:
+        logger.error(f"Error resetting address update count: {e}")
 
