@@ -188,17 +188,21 @@ async def webhook_handler(request: Request):
                 if button_id == "confirm_order":
                     # Treat as text message "Confirm"
                     message_text = "Confirm"
-                    # Proceed to process as text message below...
-                    # We can either recursively call logic or just set message_text and let it fall through
-                    # But since we have a return above, we need to restructure or just copy logic.
-                    # Simplest: Set msg_type to text and let it fall through
-                    msg_type = "text" 
-                    # We need to inject this into the message object or just handle it here.
-                    # Let's handle it here to avoid complex flow changes.
                     
+                    # Extract context ID (the ID of the message being replied to)
+                    context_id = message.get("context", {}).get("id")
+                    internal_message_id = None
+                    
+                    if context_id:
+                        internal_message_id = db.get_message_id_by_whatsapp_id(context_id)
+                        logger.info(f"Resolved context_id {context_id} to internal_message_id {internal_message_id}")
+
                     logger.info(f"Processing button reply from {sender_id}: {message_text}")
                     db.log_message(sender_id, "user", message_text)
-                    ai_response = brain.generate_response(sender_id, message_text)
+                    
+                    # Pass internal_message_id to brain
+                    ai_response = brain.generate_response(sender_id, message_text, message_id=internal_message_id)
+                    
                     if ai_response:
                         db.log_message(sender_id, "assistant", ai_response)
                         whatsapp.send_message(sender_id, ai_response)
@@ -215,11 +219,11 @@ async def webhook_handler(request: Request):
             # 2. Generate AI response (Brain)
             ai_response = brain.generate_response(sender_id, message_text)
             
-            # 3. Log Assistant Message
-            db.log_message(sender_id, "assistant", ai_response)
+            # 3. Send response back to WhatsApp
+            wamid = whatsapp.send_message(sender_id, ai_response)
 
-            # 4. Send response back to WhatsApp
-            whatsapp.send_message(sender_id, ai_response)
+            # 4. Log Assistant Message
+            db.log_message(sender_id, "assistant", ai_response, whatsapp_message_id=wamid)
         
         return {"status": "ok"}
     except Exception as e:

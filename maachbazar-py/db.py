@@ -114,20 +114,39 @@ def update_user_language(phone_number: str, language: str):
     except Exception as e:
         logger.error(f"Error updating language: {e}")
 
-def log_message(phone_number: str, role: str, content: str):
+def log_message(phone_number: str, role: str, content: str, whatsapp_message_id: str = None):
     """
     Logs a message to the database.
     Role: 'user' or 'assistant'
+    whatsapp_message_id: External ID from WhatsApp (wamid)
     """
     if not supabase: return
     try:
-        supabase.table("messages").insert({
+        data = {
             "user_phone": phone_number,
             "role": role,
             "content": content
-        }).execute()
+        }
+        if whatsapp_message_id:
+            data["whatsapp_message_id"] = whatsapp_message_id
+
+        supabase.table("messages").insert(data).execute()
     except Exception as e:
         logger.error(f"Error logging message: {e}")
+
+def get_message_id_by_whatsapp_id(whatsapp_message_id: str):
+    """
+    Fetches the internal DB ID for a given WhatsApp Message ID.
+    """
+    if not supabase: return None
+    try:
+        response = supabase.table("messages").select("id").eq("whatsapp_message_id", whatsapp_message_id).execute()
+        if response.data:
+            return response.data[0]['id']
+        return None
+    except Exception as e:
+        logger.error(f"Error fetching message ID by wamid: {e}")
+        return None
 
 def get_chat_history(phone_number: str, limit: int = 5):
     """
@@ -207,15 +226,33 @@ def get_user_address(phone_number: str):
     except Exception as e:
         logger.error(f"Error fetching address: {e}")
         return None
-def create_order(user_phone: str, items: list, address: str = None):
+def check_order_exists(message_id: int):
+    """
+    Checks if an order already exists for a given message_id.
+    """
+    if not supabase: return False
+    try:
+        response = supabase.table("orders").select("id").eq("message_id", message_id).execute()
+        return len(response.data) > 0
+    except Exception as e:
+        logger.error(f"Error checking order existence: {e}")
+        return False
+
+def create_order(user_phone: str, items: list, address: str = None, message_id: int = None):
     """
     Creates a new order with multiple items.
     items: list of dicts [{'fish_name': 'Rohu', 'quantity': 1.5, 'price_per_kg': 250}]
+    message_id: ID of the message that triggered the order (optional)
     """
     if not supabase:
         return {"error": "Supabase not configured"}
 
     try:
+        # 0. Idempotency Check
+        if message_id and check_order_exists(message_id):
+            logger.info(f"Order already exists for message_id {message_id}")
+            return {"error": "Order already placed for this message"}
+
         # 1. Calculate total price
         total_price = 0
         for item in items:
@@ -232,6 +269,9 @@ def create_order(user_phone: str, items: list, address: str = None):
             order_data["delivery_address"] = address
             # Also update user profile
             update_user_address(user_phone, address)
+        
+        if message_id:
+            order_data["message_id"] = message_id
 
         order_response = supabase.table("orders").insert(order_data).execute()
         
@@ -253,6 +293,14 @@ def create_order(user_phone: str, items: list, address: str = None):
             
         logger.info(f"Inserting order items: {order_items_data}")
         supabase.table("order_items").insert(order_items_data).execute()
+
+        # 4. Update Message Status (if message_id provided)
+        if message_id:
+            try:
+                supabase.table("messages").update({"order_placed": True}).eq("id", message_id).execute()
+            except Exception as e:
+                logger.error(f"Failed to update message status for {message_id}: {e}")
+                # Don't fail the whole order if this fails, but log it.
         
         return {"order_id": order_id, "total_price": total_price, "status": "success"}
 

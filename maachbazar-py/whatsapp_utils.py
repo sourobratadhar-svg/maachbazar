@@ -70,10 +70,12 @@ def send_language_menu(to_phone: str):
         response = requests.post(url, headers=headers, json=payload)
         response.raise_for_status()
         logger.info(f"Language menu sent to {to_phone}")
+        return response.json()['messages'][0]['id']
     except requests.exceptions.RequestException as e:
         logger.error(f"Failed to send language menu: {e}")
         if e.response:
             logger.error(f"Response: {e.response.text}")
+        return None
 
 def send_interactive_button(to_phone: str, text_body: str, buttons: list):
     """
@@ -120,7 +122,9 @@ def send_interactive_button(to_phone: str, text_body: str, buttons: list):
         response = requests.post(url, headers=headers, json=payload)
         response.raise_for_status()
         logger.info(f"Interactive button sent to {to_phone}: {text_body}")
+        return response.json()['messages'][0]['id']
     except requests.exceptions.RequestException as e:
         logger.error(f"Failed to send interactive button: {e}")
         if e.response:
             logger.error(f"Response: {e.response.text}")
+        return None

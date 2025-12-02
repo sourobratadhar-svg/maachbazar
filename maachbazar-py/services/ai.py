@@ -89,7 +89,7 @@ place_order_tool = {
     ]
 }
 
-def generate_response(prompt: str, user_phone: str = None, user_address: str = None) -> str:
+def generate_response(prompt: str, user_phone: str = None, user_address: str = None, message_id: int = None) -> str:
     """
     Generates a response from Gemini based on the user's prompt.
     Supports function calling for placing orders.
@@ -147,7 +147,7 @@ def generate_response(prompt: str, user_phone: str = None, user_address: str = N
                 address = fc.args.get("address")
                 
                 # Execute DB function
-                result = db.create_order(user_phone, items_data, address)
+                result = db.create_order(user_phone, items_data, address, message_id)
                 
                 if "error" in result:
                     return f"Sorry, I couldn't place the order. Error: {result['error']}"
