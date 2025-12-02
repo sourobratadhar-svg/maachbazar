@@ -32,10 +32,12 @@ def send_message(to: str, body: str):
         response = requests.post(url, headers=headers, json=data)
         response.raise_for_status()
         logger.info(f"Message sent to {to}: {body}")
+        return response.json()['messages'][0]['id']
     except requests.exceptions.RequestException as e:
         logger.error(f"Failed to send message: {e}")
         if e.response:
             logger.error(f"Response: {e.response.text}")
+        return None
 
 def process_webhook_payload(payload: dict):
     """

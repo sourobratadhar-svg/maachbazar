@@ -5,7 +5,7 @@ from services import ai
 
 logger = logging.getLogger(__name__)
 
-def generate_response(sender_id: str, message_text: str) -> str:
+def generate_response(sender_id: str, message_text: str, message_id: int = None) -> str:
     """
     Generates a response using Gemini, incorporating chat history and user context.
     """
@@ -39,15 +39,18 @@ User: {message_text}
 Assistant:
 """
         # 5. Call AI Service
-        response = ai.generate_response(full_prompt, user_phone=sender_id, user_address=user_address)
+        response = ai.generate_response(full_prompt, user_phone=sender_id, user_address=user_address, message_id=message_id)
         
         # Check if response asks for confirmation
         if "confirm" in response.lower() and "?" in response:
              # Send interactive button
-             buttons = [{"id": "confirm_order", "title": "Confirm Korun ✅"}]
-             whatsapp_utils.send_interactive_button(sender_id, response, buttons)
-             # Log assistant message
-             db.log_message(sender_id, "assistant", response)
+             buttons = [
+                 {"id": "confirm_order", "title": "Confirm Korun ✅"},
+                 {"id": "change_address", "title": "Change Address 🏠"}
+             ]
+             wamid = whatsapp_utils.send_interactive_button(sender_id, response, buttons)
+             # Log assistant message with wamid
+             db.log_message(sender_id, "assistant", response, whatsapp_message_id=wamid)
              return None # Signal that message is already sent
 
         return response

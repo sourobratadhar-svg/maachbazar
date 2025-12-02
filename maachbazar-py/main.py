@@ -188,20 +188,34 @@ async def webhook_handler(request: Request):
                 if button_id == "confirm_order":
                     # Treat as text message "Confirm"
                     message_text = "Confirm"
-                    # Proceed to process as text message below...
-                    # We can either recursively call logic or just set message_text and let it fall through
-                    # But since we have a return above, we need to restructure or just copy logic.
-                    # Simplest: Set msg_type to text and let it fall through
-                    msg_type = "text" 
-                    # We need to inject this into the message object or just handle it here.
-                    # Let's handle it here to avoid complex flow changes.
                     
+                    # Extract context ID (the ID of the message being replied to)
+                    context_id = message.get("context", {}).get("id")
+                    internal_message_id = None
+                    
+                    if context_id:
+                        internal_message_id = db.get_message_id_by_whatsapp_id(context_id)
+                        logger.info(f"Resolved context_id {context_id} to internal_message_id {internal_message_id}")
+
                     logger.info(f"Processing button reply from {sender_id}: {message_text}")
                     db.log_message(sender_id, "user", message_text)
-                    ai_response = brain.generate_response(sender_id, message_text)
+                    
+                    # Pass internal_message_id to brain
+                    ai_response = brain.generate_response(sender_id, message_text, message_id=internal_message_id)
+                    
                     if ai_response:
                         db.log_message(sender_id, "assistant", ai_response)
                         whatsapp.send_message(sender_id, ai_response)
+                    return {"status": "ok"}
+                
+                elif button_id == "change_address":
+                    # Handle Change Address
+                    logger.info(f"User {sender_id} requested to change address")
+                    db.update_user_state(sender_id, "AWAITING_ADDRESS")
+                    
+                    response_text = "Please type your new address (include Floor, Block, Gali)."
+                    whatsapp.send_message(sender_id, response_text)
+                    db.log_message(sender_id, "assistant", response_text)
                     return {"status": "ok"}
 
         # 4. Handle Text Message
@@ -209,17 +223,41 @@ async def webhook_handler(request: Request):
             message_text = message.get("text", {}).get("body")
             logger.info(f"Processing message from {sender_id}: {message_text}")
             
+            # 0. Check User State
+            current_state = db.get_user_state(sender_id)
+            
+            if current_state == "AWAITING_ADDRESS":
+                # Treat this text as the new address
+                new_address = message_text
+                db.update_user_address(sender_id, new_address)
+                db.update_user_state(sender_id, None) # Clear state
+                
+                # Log the address update
+                db.log_message(sender_id, "user", f"Updated address to: {new_address}")
+                
+                # Trigger confirmation again
+                confirm_msg = f"Address updated to: {new_address}. Do you want to confirm your order now?"
+                
+                # Send interactive buttons again
+                buttons = [
+                    {"id": "confirm_order", "title": "Confirm Korun ✅"},
+                    {"id": "change_address", "title": "Change Address 🏠"}
+                ]
+                wamid = whatsapp_utils.send_interactive_button(sender_id, confirm_msg, buttons)
+                db.log_message(sender_id, "assistant", confirm_msg, whatsapp_message_id=wamid)
+                return {"status": "ok"}
+
             # 1. Log User Message
             db.log_message(sender_id, "user", message_text)
 
             # 2. Generate AI response (Brain)
             ai_response = brain.generate_response(sender_id, message_text)
             
-            # 3. Log Assistant Message
-            db.log_message(sender_id, "assistant", ai_response)
+            # 3. Send response back to WhatsApp
+            wamid = whatsapp.send_message(sender_id, ai_response)
 
-            # 4. Send response back to WhatsApp
-            whatsapp.send_message(sender_id, ai_response)
+            # 4. Log Assistant Message
+            db.log_message(sender_id, "assistant", ai_response, whatsapp_message_id=wamid)
         
         return {"status": "ok"}
     except Exception as e:
