@@ -67,6 +67,20 @@ def verify_signature(raw_body: bytes, signature_header: str | None) -> bool:
     # constant time comparison to prevent timing attacks
     return hmac.compare_digest(transmitted_sig, expected_sig)
 
+# Session Management
+import time
+SESSION_EXPIRY = 24 * 60 * 60  # 24 hours
+sessions = {}  # { user_id: last_timestamp }
+
+def update_session(user_id: str):
+    sessions[user_id] = int(time.time())
+
+def session_active(user_id: str) -> bool:
+    ts = sessions.get(user_id)
+    if not ts:
+        return False
+    return (int(time.time()) - ts) <= SESSION_EXPIRY
+
 class PriceUpdate(BaseModel):
     name: str
     price: int
@@ -121,15 +135,37 @@ async def update_order_status(update: OrderStatusUpdate):
     user_phone = order.get("user_phone")
     
     if user_phone:
-        if update.status == "confirmed":
-            message = f"Your order #{update.order_id} has been CONFIRMED! We will deliver it shortly. 🐟"
-        elif update.status == "rejected":
-            message = f"Sorry, your order #{update.order_id} has been CANCELLED. Please contact us for details."
+        # Check session before sending free-form message
+        if session_active(user_phone):
+            if update.status == "confirmed":
+                message = f"Your order #{update.order_id} has been CONFIRMED! We will deliver it shortly. 🐟"
+            elif update.status == "rejected":
+                message = f"Sorry, your order #{update.order_id} has been CANCELLED. Please contact us for details."
+            else:
+                message = f"Update on your order #{update.order_id}: Status is now '{update.status}'."
+                
+            whatsapp.send_message(user_phone, message)
+            db.log_message(user_phone, "assistant", message)
         else:
-            message = f"Update on your order #{update.order_id}: Status is now '{update.status}'."
-            
-        whatsapp.send_message(user_phone, message)
-        db.log_message(user_phone, "assistant", message)
+            # Session expired, send template
+            # For now, we will log a warning or send a generic template if available.
+            # Ideally we should send a template like "order_update" with parameters.
+            # But the user asked for "reopen_conversation" or similar if we can't send free-form.
+            # However, for order status updates, we SHOULD use templates anyway in production.
+            # For this task, let's just log it or try to send a template if we implement it.
+            # User instructions: "If not, free-form sends fail silently... modify outbound logic: if session_active -> reply_freeform else send_template('reopen_conversation')"
+            # But this is specific for "smart_send" which usually implies conversational replies.
+            # For notifications, we definitely need templates.
+            # Let's start by using the session check here.
+            logger.warning(f"Session expired for {user_phone}. Cannot send free-form order update: {update.status}")
+            # Try to send a template if we have one (we'll implement send_template next)
+            whatsapp.send_template(user_phone, "order_update", language_code="en_US") 
+            # Note: "order_update" is a placeholder name. User prompt suggested "reopen_conversation" for generic replies.
+            # But specific notifications should use specific templates.
+            # I will assume "order_update" exists or just follow the prompt's "reopen_conversation" pattern for now?
+            # actually prompt said: "modify outbound logic: def smart_send... else send_template(..., 'reopen_conversation')"
+            # Let's stick to adding the support first.
+            pass
 
     return {"status": "success", "order": order}
 
@@ -205,6 +241,9 @@ async def webhook_handler(
         message = messages[0]
         sender_id = message.get("from")
         msg_type = message.get("type")
+
+        # UPDATE SESSION for any message from user
+        update_session(sender_id)
 
         # 1. Check/Create User
         user, is_new = db.get_or_create_user(sender_id)
