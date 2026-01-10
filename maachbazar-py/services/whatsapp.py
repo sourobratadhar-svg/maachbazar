@@ -63,7 +63,7 @@ def process_webhook_payload(payload: dict):
     
     return None, None
 
-def send_template(to_phone: str, template_name: str, language_code: str = "en_US"):
+def send_template(to_phone: str, template_name: str, language_code: str = "en_US", components: list = None):
     """
     Sends a WhatsApp template message.
     """
@@ -88,6 +88,9 @@ def send_template(to_phone: str, template_name: str, language_code: str = "en_US
             }
         }
     }
+
+    if components:
+        payload["template"]["components"] = components
 
     try:
         response = requests.post(url, headers=headers, json=payload)

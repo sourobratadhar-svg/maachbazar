@@ -148,24 +148,34 @@ async def update_order_status(update: OrderStatusUpdate):
             db.log_message(user_phone, "assistant", message)
         else:
             # Session expired, send template
-            # For now, we will log a warning or send a generic template if available.
-            # Ideally we should send a template like "order_update" with parameters.
-            # But the user asked for "reopen_conversation" or similar if we can't send free-form.
-            # However, for order status updates, we SHOULD use templates anyway in production.
-            # For this task, let's just log it or try to send a template if we implement it.
-            # User instructions: "If not, free-form sends fail silently... modify outbound logic: if session_active -> reply_freeform else send_template('reopen_conversation')"
-            # But this is specific for "smart_send" which usually implies conversational replies.
-            # For notifications, we definitely need templates.
-            # Let's start by using the session check here.
-            logger.warning(f"Session expired for {user_phone}. Cannot send free-form order update: {update.status}")
-            # Try to send a template if we have one (we'll implement send_template next)
-            whatsapp.send_template(user_phone, "order_update", language_code="en_US") 
-            # Note: "order_update" is a placeholder name. User prompt suggested "reopen_conversation" for generic replies.
-            # But specific notifications should use specific templates.
-            # I will assume "order_update" exists or just follow the prompt's "reopen_conversation" pattern for now?
-            # actually prompt said: "modify outbound logic: def smart_send... else send_template(..., 'reopen_conversation')"
-            # Let's stick to adding the support first.
-            pass
+            logger.warning(f"Session expired for {user_phone}. Sending order_update template.")
+            
+            # Prepare template parameters (Body vars: {{1}}=order_id, {{2}}=arrival_time)
+            # Default arrival time since we don't store it yet
+            arrival_time = "within 45-60 minutes"
+            
+            components = [
+                {
+                    "type": "body",
+                    "parameters": [
+                        {
+                            "type": "text",
+                            "text": str(update.order_id)
+                        },
+                        {
+                            "type": "text",
+                            "text": arrival_time
+                        }
+                    ]
+                }
+            ]
+            
+            whatsapp.send_template(
+                user_phone, 
+                "order_update", 
+                language_code="en", 
+                components=components
+            )
 
     return {"status": "success", "order": order}
 
