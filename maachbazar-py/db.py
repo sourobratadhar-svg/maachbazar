@@ -97,12 +97,36 @@ def get_or_create_user(phone_number: str):
             return response.data[0], False
         
         # Create new user
-        new_user = {"phone": phone_number, "language": None}
+        new_user = {"phone": phone_number, "language": None, "opt_in": True} # Default opt-in on first contact
         response = supabase.table("users").insert(new_user).execute()
         return response.data[0], True
     except Exception as e:
         logger.error(f"Error in get_or_create_user: {e}")
         return None, False
+
+def get_opt_in_users():
+    """
+    Fetches all users who have opted in.
+    """
+    if not supabase: return []
+    try:
+        response = supabase.table("users").select("phone, language").eq("opt_in", True).execute()
+        return response.data
+    except Exception as e:
+        logger.error(f"Error fetching opt-in users: {e}")
+        return []
+
+def update_user_last_active(phone_number: str):
+    """
+    Updates the last_active_ts for a user.
+    """
+    if not supabase: return
+    try:
+        import datetime
+        now = datetime.datetime.utcnow().isoformat()
+        supabase.table("users").update({"last_active_ts": now, "opt_in": True}).eq("phone", phone_number).execute()
+    except Exception as e:
+        logger.error(f"Error updating last_active_ts: {e}")
 
 def update_user_language(phone_number: str, language: str):
     """

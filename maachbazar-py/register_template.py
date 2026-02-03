@@ -1,4 +1,3 @@
-
 import os
 import requests
 import json
@@ -15,32 +14,47 @@ if not os.getenv("WHATSAPP_BUSINESS_ACCOUNT_ID"):
         load_dotenv(sibling_env)
 
 WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN")
-PHONE_NUMBER_ID = os.getenv("PHONE_NUMBER_ID")
 WABA_ID = os.getenv("WHATSAPP_BUSINESS_ACCOUNT_ID")
 
-def register_template():
-    waba_id = os.getenv("WHATSAPP_BUSINESS_ACCOUNT_ID")
-    if not waba_id:
+def register_daily_template():
+    if not WABA_ID:
         print("Error: WHATSAPP_BUSINESS_ACCOUNT_ID is not set in .env")
         return
 
-    url = f"https://graph.facebook.com/v20.0/{waba_id}/message_templates"
+    url = f"https://graph.facebook.com/v17.0/{WABA_ID}/message_templates"
     headers = {
         "Authorization": f"Bearer {WHATSAPP_TOKEN}",
         "Content-Type": "application/json"
     }
     
+    # Template: fresh_stock_alert
+    # Text:
+    # Hello {{1}}, good morning! 🌞
+    # Today's fresh stock has arrived at Maachbazar.
+    # Reply with *order* to place an order or *menu* to view the list.
+
     payload = {
-        "name": "order_update",
-        "category": "UTILITY",
+        "name": "maachbazar_intro_v2",
+        "category": "MARKETING",
         "language": "en",
         "components": [
             {
                 "type": "BODY",
-                "text": "Your order {{1}} is confirmed and will arrive by {{2}}."
+                "text": "Hello {{1}}! This is Maachbazar.\n\nFresh fish & poultry delivered to your door.\nTap below to view our items."
+            },
+            {
+                "type": "BUTTONS",
+                "buttons": [
+                    {
+                        "type": "QUICK_REPLY",
+                        "text": "View Items"
+                    }
+                ]
             }
         ]
     }
+    
+    print(f"Registering template '{payload['name']}' to WABA {WABA_ID}...")
     
     try:
         response = requests.post(url, headers=headers, json=payload)
@@ -56,4 +70,4 @@ if __name__ == "__main__":
     if not WHATSAPP_TOKEN:
         print("Error: WHATSAPP_TOKEN not set")
     else:
-        register_template()
+        register_daily_template()

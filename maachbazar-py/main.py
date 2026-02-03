@@ -246,6 +246,21 @@ async def webhook_handler(
         messages = value.get("messages", [])
 
         if not messages:
+            # Check for statuses
+            statuses = value.get("statuses", [])
+            if statuses:
+                for status in statuses:
+                    # status updates: sent, delivered, read, failed
+                    # We can log this or update a 'messages' table row if we track by ID
+                    wamid = status.get("id")
+                    status_state = status.get("status")
+                    recipient_id = status.get("recipient_id")
+                    
+                    logger.info(f"Message {wamid} to {recipient_id} is {status_state}")
+                    # If we had a mechanism to update message status in DB, we'd do it here.
+                    # For now just logging is sufficient for MVP or extended later.
+                return {"status": "ok"}
+            
             return {"status": "ok"}
 
         message = messages[0]
@@ -254,6 +269,9 @@ async def webhook_handler(
 
         # UPDATE SESSION for any message from user
         update_session(sender_id)
+        
+        # UPDATE OPT-IN & LAST ACTIVE
+        db.update_user_last_active(sender_id)
 
         # 1. Check/Create User
         user, is_new = db.get_or_create_user(sender_id)
@@ -380,6 +398,10 @@ async def webhook_handler(
         logger.error(f"Error processing webhook: {e}")
         return {"status": "error", "message": str(e)}
 
+@app.on_event("startup")
+async def startup_event():
+    from services.scheduler import start_scheduler
+    start_scheduler()
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
