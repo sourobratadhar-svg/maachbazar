@@ -220,6 +220,136 @@
             position: relative;
             z-index: 1;
         }
+
+        /* Product Catalogue Styles */
+        .category-tabs {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 1rem;
+            margin-bottom: 2.5rem;
+        }
+
+        .tab-btn {
+            background: white;
+            border: 2px solid #10B981;
+            color: #10B981;
+            padding: 0.75rem 1.75rem;
+            border-radius: 9999px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            font-size: 1rem;
+            box-shadow: 0 2px 4px rgba(16, 185, 129, 0.1);
+        }
+
+        .tab-btn.active,
+        .tab-btn:hover {
+            background: #10B981;
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(16, 185, 129, 0.25);
+        }
+
+        .product-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 1.5rem;
+            animation: fadeIn 0.5s ease-out forwards;
+        }
+
+        .product-card {
+            background: white;
+            border-radius: 1rem;
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 1px solid #f3f4f6;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .product-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(to right, #10B981, #34D399);
+            transform: scaleX(0);
+            transform-origin: left;
+            transition: transform 0.3s ease;
+        }
+
+        .product-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 20px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            border-color: #e5e7eb;
+        }
+
+        .product-card:hover::before {
+            transform: scaleX(1);
+        }
+
+        .product-name {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 0.75rem;
+            line-height: 1.4;
+        }
+
+        .product-price-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: auto;
+            padding-top: 1rem;
+            border-top: 1px dashed #e5e7eb;
+        }
+
+        .product-price {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #10B981;
+        }
+
+        .stock-badge {
+            background: #d1fae5;
+            color: #059669;
+            padding: 0.35rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .stock-badge::before {
+            content: '';
+            display: inline-block;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #059669;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(15px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
     </style>
 </head>
 
@@ -292,31 +422,33 @@
     </main>
 
     <!-- Daily Prices Section -->
-    <section id="prices" class="py-20 bg-white">
-        <div class="container mx-auto px-6">
-            <h2 class="text-3xl font-bold text-center mb-12">Today's Market Prices 🐟</h2>
-            <div id="price-loader" class="text-center text-xl text-gray-500">Loading fresh catches...</div>
-            <div id="price-error" class="text-center text-xl text-red-500 hidden">Unable to load prices. Please try
-                again later.</div>
-
-            <div class="relative w-full overflow-auto">
-                <table id="price-table" class="w-full caption-bottom text-sm hidden">
-                    <thead class="[&_tr]:border-b">
-                        <tr class="border-b transition-colors hover:bg-gray-50">
-                            <th class="h-12 px-4 text-left align-middle font-medium text-gray-500">Fish Name</th>
-                            <th class="h-12 px-4 text-left align-middle font-medium text-gray-500">Price (₹/kg)</th>
-                            <th class="h-12 px-4 text-left align-middle font-medium text-gray-500">Available</th>
-                        </tr>
-                    </thead>
-                    <tbody id="price-list-body" class="[&_tr:last-child]:border-0">
-                        <!-- Prices will be inserted here -->
-                    </tbody>
-                </table>
+    <section id="prices" class="py-20 bg-gray-50">
+        <div class="container mx-auto px-6 max-w-6xl">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Today's Market Prices 🐟</h2>
+                <p class="text-gray-600 text-lg max-w-2xl mx-auto">Discover our fresh, premium selection of seafood and
+                    poultry. Prices updated daily for the best local deals.</p>
             </div>
-            <div class="text-center mt-8">
-                <p class="text-gray-600 mb-4">Prices updated daily by our sellers.</p>
+
+            <div id="catalogue-container">
+                <!-- Categories will be generated here -->
+                <div id="category-tabs" class="category-tabs"></div>
+
+                <!-- Products will be generated here -->
+                <div id="product-grid" class="product-grid"></div>
+            </div>
+
+            <div class="text-center mt-12 bg-white rounded-2xl p-8 shadow-sm border border-gray-100 max-w-3xl mx-auto">
+                <h3 class="text-xl font-bold text-gray-800 mb-3">Ready to place your order?</h3>
+                <p class="text-gray-600 mb-6">Our sellers refresh this list every morning. Message us on WhatsApp to
+                    confirm availability and order!</p>
                 <a href="https://wa.me/919818743327"
-                    class="inline-block bg-green-600 text-white px-6 py-2 rounded-full hover:bg-green-700 transition">
+                    class="inline-flex items-center justify-center bg-[#25D366] text-white px-8 py-3.5 rounded-full font-bold hover:bg-[#128C7E] transition-all transform hover:scale-105 shadow-lg group">
+                    <svg class="w-6 h-6 mr-2 group-hover:animate-bounce" fill="currentColor" viewBox="0 0 24 24"
+                        xmlns="http://www.w3.org/2000/svg">
+                        <path
+                            d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+                    </svg>
                     Order on WhatsApp
                 </a>
             </div>
@@ -587,49 +719,85 @@
                 }
             });
         }
-        // Fetch Prices
-        async function fetchPrices() {
-            const loader = document.getElementById('price-loader');
-            const errorDiv = document.getElementById('price-error');
-            const table = document.getElementById('price-table');
-            const tbody = document.getElementById('price-list-body');
-
-            // Use deployed API URL or localhost fallback
-            const API_URL = "https://maachbazar.onrender.com/api/inventory";
-            // const API_URL = "http://localhost:8000/api/inventory"; // Testing locally
-
-            try {
-                const response = await fetch(API_URL);
-                if (!response.ok) throw new Error("Failed to fetch");
-                const data = await response.json();
-
-                tbody.innerHTML = '';
-                data.forEach(item => {
-                    const row = document.createElement('tr');
-                    row.className = "border-b transition-colors hover:bg-gray-50";
-                    row.innerHTML = `
-                        <td class="p-4 align-middle font-medium">${item.name}</td>
-                        <td class="p-4 align-middle">₹${item.price}</td>
-                        <td class="p-4 align-middle">
-                            ${item.is_available
-                            ? '<span class="text-green-600 font-medium">✓ Yes</span>'
-                            : '<span class="text-red-600 font-medium">✗ No</span>'}
-                        </td>
-                    `;
-                    tbody.appendChild(row);
-                });
-
-                loader.classList.add('hidden');
-                table.classList.remove('hidden');
-            } catch (error) {
-                console.error("Error fetching prices:", error);
-                loader.classList.add('hidden');
-                errorDiv.classList.remove('hidden');
+        // Product Catalogue Data
+        const catalogueData = {
+            "Fresh Water Fish": {
+                "Cut PC Katla": 490, "Cut PC Katla (Peti)": 540, "Cut PC Rui": 490,
+                "Full PC Rui (1kg-2kg)": 260, "Full PC Katla (2-4kg)": 290,
+                "Gurjoli (Indian Salmon)": 810, "Aar": 450, "Boal": 350,
+                "Pabda": 490, "Tengra": 490, "Bata": 410, "Roopchand": 310,
+                "Bacha": 310, "Foli": 230, "Baam": 410, "Parshe (250gm)": 135
+            },
+            "Sea Fish": {
+                "Bhetki": 660, "Lottey": 210, "Pomfret (6-7pc)": 210,
+                "Pomfret (4pc per kg)": 1110, "Aila (Mackerel)": 360, "Black Pomfret": 810
+            },
+            "Live Fish": {
+                "Live Rui": 360, "Live Shol": 810, "Cat Fish": 190,
+                "Singhi": 810, "Live Telapiya": 230, "Desi Koi": 810
+            },
+            "Ilish & Specialty": {
+                "Premium Quality Ilish (1.5kg)": 1860, "Premium Quality Ilish (1-1.35kg)": 1660,
+                "Premium Quality Ilish (500gm-900gm)": 1010, "Vietnam Basa": 510,
+                "Salmon (Imported)": 3210
+            },
+            "Prawns": {
+                "Golda Chingri (6-10pc/kg)": 860, "Tiger Prawns (Bagda) (35-40pc/kg)": 660,
+                "Prawns (30-35pc/kg)": 590, "Prawns (60-70pc/kg)": 410
             }
+        };
+
+        let currentCategory = "Fresh Water Fish";
+
+        function renderTabs() {
+            const tabsContainer = document.getElementById('category-tabs');
+            tabsContainer.innerHTML = '';
+
+            Object.keys(catalogueData).forEach(category => {
+                const btn = document.createElement('button');
+                btn.className = `tab-btn ${category === currentCategory ? 'active' : ''}`;
+                btn.innerText = category;
+                btn.onclick = () => {
+                    currentCategory = category;
+                    renderTabs();
+                    renderProducts();
+                };
+                tabsContainer.appendChild(btn);
+            });
         }
 
-        // Load prices on page load
-        document.addEventListener('DOMContentLoaded', fetchPrices);
+        function renderProducts() {
+            const grid = document.getElementById('product-grid');
+            grid.innerHTML = '';
+
+            // Re-trigger animation by cloning and replacing
+            const newGrid = grid.cloneNode(false);
+            grid.parentNode.replaceChild(newGrid, grid);
+
+            const products = catalogueData[currentCategory];
+            Object.entries(products).forEach(([name, price]) => {
+                const card = document.createElement('div');
+                card.className = 'product-card';
+                card.innerHTML = `
+                    <h4 class="product-name">${name}</h4>
+                    <div class="product-price-row">
+                        <span class="product-price">₹${price}<span class="text-sm text-gray-500 font-normal ml-1">/kg</span></span>
+                        <span class="stock-badge">In Stock</span>
+                    </div>
+                `;
+                newGrid.appendChild(card);
+            });
+        }
+
+        function initializeCatalogue() {
+            renderTabs();
+            renderProducts();
+        }
+
+        // Initialize on DOM load
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeCatalogue();
+        });
     </script>
 </body>
 
